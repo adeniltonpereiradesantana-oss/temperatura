@@ -34,6 +34,7 @@ label{display:block;font-size:13px;font-weight:600;color:#334155;margin-bottom:1
 input,select,textarea{display:block;width:100%;margin-top:5px;padding:12px;border:1.5px solid var(--line);border-radius:11px;background:#fff;outline:none;font-size:16px}
 input:focus,select:focus,textarea:focus{border-color:var(--pri2);box-shadow:0 0 0 3px rgba(8,145,178,.15)}
 textarea{resize:vertical}
+input::placeholder,textarea::placeholder{color:#a3afbf;font-weight:400}
 .chk{display:flex;align-items:center;gap:10px;font-weight:500}
 .chk input{width:22px;height:22px;margin:0}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:12px 16px;font-weight:650;cursor:pointer;background:#e2e8f0;color:var(--ink);text-decoration:none}
@@ -81,6 +82,7 @@ main{max-width:980px;margin:0 auto;padding:14px 14px calc(90px + env(safe-area-i
 .lista{display:flex;flex-direction:column;gap:8px}
 .item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);border:1.5px solid transparent;border-radius:var(--r);box-shadow:var(--sh);padding:13px 12px;cursor:pointer}
 .item:active{transform:scale(.99)}
+.item.static{cursor:default}.item.static:active{transform:none}
 .item .ico{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:#f1f5f9;color:var(--muted);flex:none}
 .item.ok .ico{background:var(--ok-s);color:var(--ok)}
 .item.bad{border-color:#fecaca}
@@ -274,7 +276,8 @@ const IC = {
   refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   print: '<path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
-  ext: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/>'
+  ext: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/>',
+  building: '<path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/>'
 };
 const ic = n => '<svg class="i" viewBox="0 0 24 24">' + (IC[n] || '') + '</svg>';
 
@@ -367,7 +370,8 @@ $('#fSenha').addEventListener('submit', e => {
 });
 
 function sessaoExpirada() {
-  store.del('tmp_token'); S.token = null; S.ini = null;
+  store.del('tmp_token'); S.token = null; S.ini = null; S.cad = null;
+  limparMemo(); limparCacheLocal();
   fecharModal(); mostrar('login');
 }
 function sair() {
@@ -379,17 +383,53 @@ function sair() {
 /* ================== App ================== */
 function entrarApp() {
   mostrar('app');
-  carregar(true);
+  carregar('inicio');
 }
 
-function carregar(primeira) {
-  busy(true);
+/* Cache local: a tela abre na hora com os últimos dados e se atualiza em seguida. */
+const MEMO = {}, MEMO_MS = 120000;
+function apiMemo(fn, ...args) {
+  const k = fn + '|' + JSON.stringify(args.slice(1));
+  const m = MEMO[k];
+  if (m && Date.now() - m.t < MEMO_MS) return Promise.resolve(m.v);
+  return api(fn, ...args).then(v => { MEMO[k] = { t: Date.now(), v: v }; return v; });
+}
+function limparMemo() { Object.keys(MEMO).forEach(k => delete MEMO[k]); }
+function limparCacheLocal() {
+  try { Object.keys(localStorage).filter(k => k.indexOf('tmp_ini_') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {}
+}
+
+function aplicarIni(d) {
+  S.ini = d; S.user = d.usuario; S.filial = d.filial;
+  montarTopo(); montarAbas();
+}
+
+/* modo: 'inicio' (abrir o app), 'filial' (troca de empresa), 'refresh' (atualizar a coleta) */
+function carregar(modo) {
+  let mostrouCache = false;
+  if (modo === 'inicio') {
+    try {
+      const c = JSON.parse(store.get('tmp_ini_' + (S.filial || '')) || 'null');
+      if (c && c.usuario) { aplicarIni(c); irPara(S.view); mostrouCache = true; marcarAtualizando(true); }
+    } catch (e) {}
+  }
+  if (!mostrouCache && modo !== 'refresh') busy(true);
+  if (modo === 'refresh') marcarAtualizando(true);
   return api('carregarInicio', S.token, S.filial).then(d => {
-    S.ini = d; S.user = d.usuario; S.filial = d.filial; store.set('tmp_filial', d.filial);
-    montarTopo(); montarAbas();
-    if (primeira) irPara(S.view);
-    else { renderColeta(); if (S.view !== 'coleta') irPara(S.view); }
-  }).catch(err => { if (S.token) toast(err.message, 'bad'); }).finally(() => busy(false));
+    aplicarIni(d);
+    store.set('tmp_filial', d.filial);
+    store.set('tmp_ini_' + d.filial, JSON.stringify(d));
+    if (modo === 'inicio' && !mostrouCache) irPara(S.view);
+    else if (modo === 'filial') irPara(S.view);
+    else if (S.view === 'coleta') renderColeta();
+  }).catch(err => { if (S.token) toast(err.message, 'bad'); })
+    .finally(() => { busy(false); marcarAtualizando(false); });
+}
+
+function marcarAtualizando(on) {
+  S.atualizando = on;
+  const b = document.getElementById('btnAtualizar');
+  if (b) b.innerHTML = ic('refresh') + (on ? 'Atualizando…' : 'Atualizar');
 }
 
 function montarTopo() {
@@ -408,7 +448,7 @@ function montarTopo() {
 $('#selFilial').addEventListener('change', e => {
   S.filial = e.target.value;
   ['v-historico', 'v-painel', 'v-relatorio'].forEach(id => { delete document.getElementById(id).dataset.ok; });
-  carregar(false);
+  carregar('filial');
 });
 $('#btnUser').addEventListener('click', menuConta);
 
@@ -417,15 +457,14 @@ const VIEWS = [
   { id: 'historico', nome: 'Histórico', ic: 'clock' },
   { id: 'painel', nome: 'Painel', ic: 'chart' },
   { id: 'relatorio', nome: 'Relatório', ic: 'file' },
-  { id: 'cadastros', nome: 'Cadastros', ic: 'cfg', admin: true }
+  { id: 'cadastros', nome: 'Cadastros', ic: 'cfg' }
 ];
 function montarAbas() {
-  $('#abas').innerHTML = VIEWS.filter(v => !v.admin || S.user.admin)
+  $('#abas').innerHTML = VIEWS
     .map(v => '<button type="button" data-v="' + v.id + '"' + (v.id === S.view ? ' class="on"' : '') + '>' + ic(v.ic) + '<span>' + v.nome + '</span></button>').join('');
   $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => irPara(b.dataset.v));
 }
 function irPara(v) {
-  if (v === 'cadastros' && !S.user.admin) v = 'coleta';
   S.view = v;
   VIEWS.forEach(x => $('#v-' + x.id).classList.toggle('hidden', x.id !== v));
   $('#abas').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
@@ -471,7 +510,7 @@ function renderColeta() {
     '<h2>' + lidos + ' de ' + eqs.length + ' termômetros lidos</h2><div class="prog"><i style="width:' + pct + '%"></i></div>' +
     (foraT ? '<p class="al" style="margin:10px 0 0">' + foraT + ' leitura(s) fora da faixa neste turno</p>' : '') + '</div>' +
     '<button class="btn pri grande" type="button" onclick="abrirScanner()">' + ic('qr') + 'Escanear QR do termômetro</button>' +
-    '<div class="sec-h"><h3>Termômetros</h3><button class="lnk" type="button" onclick="carregar(false)">' + ic('refresh') + 'Atualizar</button></div>' +
+    '<div class="sec-h"><h3>Termômetros</h3><button class="lnk" type="button" id="btnAtualizar" onclick="carregar(\'refresh\')">' + ic('refresh') + (S.atualizando ? 'Atualizando…' : 'Atualizar') + '</button></div>' +
     '<div class="lista">' + (eqs.map(itemEq).join('') || '<div class="vazio">Nenhum termômetro ativo nesta filial.</div>') + '</div>';
 }
 
@@ -569,6 +608,7 @@ function salvarLeitura() {
     e.ultima = Object.assign({ ts: r.ts, obs: obs }, l);
     e.lidoTurno = true; e.alertas = r.alertas;
     formEq = null; fecharModal(); renderColeta();
+    limparMemo(); store.set('tmp_ini_' + S.filial, JSON.stringify(S.ini));
     if (navigator.vibrate) try { navigator.vibrate(60); } catch (x) {}
     const pend = S.ini.equipamentos.filter(x => !x.lidoTurno).length;
     const msg = r.alertas.length ? 'Salvo — leitura fora da faixa registrada.' : 'Leitura salva ✓';
@@ -691,7 +731,7 @@ function buscarHistorico() {
   const f = { filial: S.filial, de: $('#hDe').value, ate: $('#hAte').value, equip: $('#hEq').value, soFora: $('#hFora').checked };
   if (!f.de || !f.ate) return toast('Escolha o período.', 'warn');
   $('#hRes').innerHTML = '<div class="vazio">Carregando…</div>';
-  api('historico', S.token, f).then(r => {
+  apiMemo('historico', S.token, f).then(r => {
     if (!r.itens.length) { $('#hRes').innerHTML = '<div class="vazio">Nenhuma leitura no período.</div>'; return; }
     const grupos = [], idx = {};
     r.itens.forEach(l => { const k = fD(l.ts); if (!(k in idx)) { idx[k] = grupos.length; grupos.push({ k: k, ls: [] }); } grupos[idx[k]].ls.push(l); });
@@ -726,7 +766,7 @@ function renderPainel() {
 function buscarPainel() {
   $('#v-painel').querySelectorAll('#pDias button').forEach(b => b.classList.toggle('on', +b.dataset.n === S.painelDias));
   $('#pRes').innerHTML = '<div class="vazio">Carregando…</div>';
-  api('painel', S.token, { filial: S.filial, de: hojeISO(-(S.painelDias - 1)), ate: hojeISO() }).then(r => { S.painelDados = r; desenharPainel(); })
+  apiMemo('painel', S.token, { filial: S.filial, de: hojeISO(-(S.painelDias - 1)), ate: hojeISO() }).then(r => { S.painelDados = r; desenharPainel(); })
     .catch(err => { $('#pRes').innerHTML = '<div class="erro">' + esc(err.message) + '</div>'; });
 }
 
@@ -767,7 +807,7 @@ function desenharPainel() {
   if (!window.Chart) { $('#gT').parentNode.innerHTML = '<p class="muted">Gráfico indisponível (sem conexão com a biblioteca).</p>'; $('#gU').parentNode.innerHTML = ''; return; }
   const labels = r.dias.map(k => k.slice(8, 10) + '/' + k.slice(5, 7));
   const FP = S.ini.faixaPadrao;
-  const ref = r.equipamentos[0] || { tmax: FP.TEMP_MAX, tmin: FP.TEMP_MIN, umax: FP.UMID_MAX, umin: FP.UMID_MIN };
+  const ref = r.faixaEmpresa || r.equipamentos[0] || { tmax: FP.TEMP_MAX, tmin: FP.TEMP_MIN, umax: FP.UMID_MAX, umin: FP.UMID_MIN };
   grafico('gT', labels, r.equipamentos.map((e, i) => ({ label: e.desc, data: e.serie[serieT], cor: CORES[i % CORES.length] })), ref.tmax, ref.tmin, ' °C');
   grafico('gU', labels, r.equipamentos.map((e, i) => ({ label: e.desc, data: e.serie[serieU], cor: CORES[i % CORES.length] })), ref.umax, ref.umin, '%');
 }
@@ -823,29 +863,60 @@ function gerarRel() {
     .finally(() => { b.disabled = false; b.innerHTML = ic('file') + 'Gerar PDF'; });
 }
 
-/* ================== Cadastros (admin) ================== */
-function renderCadastros() {
-  const v = $('#v-cadastros');
-  v.innerHTML = '<div class="seg" id="cSeg"><button type="button" data-a="eq">Termômetros</button><button type="button" data-a="us">Usuários</button><button type="button" data-a="qr">Etiquetas QR</button></div><div id="cRes"><div class="vazio">Carregando…</div></div>';
-  v.querySelectorAll('#cSeg button').forEach(b => b.onclick = () => { S.cadAba = b.dataset.a; desenharCad(); });
-  busy(true);
-  api('carregarCadastros', S.token).then(d => { S.cad = d; desenharCad(); })
-    .catch(err => { $('#cRes').innerHTML = '<div class="erro">' + esc(err.message) + '</div>'; }).finally(() => busy(false));
+/* ================== Cadastros ==================
+   ADMIN: empresas, termômetros (criar/editar/excluir), usuários, etiquetas
+   USER : termômetros da própria empresa (só cadastrar) e etiquetas */
+function abasCad() {
+  return S.user.admin
+    ? [['emp', 'Empresas'], ['eq', 'Termômetros'], ['us', 'Usuários'], ['qr', 'Etiquetas']]
+    : [['eq', 'Termômetros'], ['qr', 'Etiquetas']];
 }
 
-const nomeFil = id => { const f = (S.cad ? S.cad.filiais : S.ini.filiais).find(x => x.id === id); return f ? f.nome : id; };
+function renderCadastros() {
+  const v = $('#v-cadastros');
+  const abas = abasCad();
+  if (!abas.some(a => a[0] === S.cadAba)) S.cadAba = S.user.admin ? 'emp' : 'eq';
+  v.innerHTML = '<div class="seg" id="cSeg">' + abas.map(a => '<button type="button" data-a="' + a[0] + '">' + a[1] + '</button>').join('') + '</div>' +
+    '<div id="cRes">' + (S.cad ? '' : '<div class="vazio">Carregando…</div>') + '</div>';
+  v.querySelectorAll('#cSeg button').forEach(b => b.onclick = () => { S.cadAba = b.dataset.a; desenharCad(); });
+  if (S.cad) desenharCad();
+  recarregarCad();
+}
+
+function recarregarCad() {
+  return api('carregarCadastros', S.token).then(d => { S.cad = d; if (S.view === 'cadastros') desenharCad(); })
+    .catch(err => { if (!S.cad) $('#cRes').innerHTML = '<div class="erro">' + esc(err.message) + '</div>'; else toast(err.message, 'bad'); });
+}
+
+const nomeFil = id => { const f = ((S.cad && S.cad.filiais) || S.ini.filiais).find(x => x.id === id); return f ? f.nome : id; };
+const faixaTxt = o => fN(o.tmin) + '–' + fN(o.tmax) + ' °C · ' + fN(o.umin, 0) + '–' + fN(o.umax, 0) + '%';
+const opcoesFil = sel => S.cad.filiais.filter(f => f.ativo || f.id === sel)
+  .map(f => '<option value="' + esc(f.id) + '"' + (f.id === sel ? ' selected' : '') + '>' + esc(f.nome + (f.cidade ? ' · ' + f.cidade : '')) + '</option>').join('');
+const nv = v => (v == null || v === '' ? '' : String(v).replace('.', ','));
 
 function desenharCad() {
-  if (!S.cad) return;
+  if (!S.cad || !$('#cSeg')) return;
   $('#cSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.a === S.cadAba));
+  const admin = S.user.admin;
   const eqs = S.cad.equipamentos.filter(e => e.filial === S.filial);
   let h = '';
-  if (S.cadAba === 'eq') {
-    h = '<div class="sec-h" style="margin-top:0"><h3>Termômetros · ' + esc(nomeFil(S.filial)) + '</h3><button class="btn pri" type="button" onclick="formEqCad()">' + ic('plus') + 'Novo</button></div><div class="lista">' +
-      (eqs.map(e => '<button class="item' + (e.ativo ? '' : ' pend') + '" type="button" onclick="formEqCad(\'' + esc(e.id) + '\')"><span class="ico">' + ic('thermo') + '</span><span class="txt"><b>' + esc(e.descricao) + '</b>' +
-        '<small>' + fN(e.tmin) + '–' + fN(e.tmax) + ' °C · ' + fN(e.umin, 0) + '–' + fN(e.umax, 0) + '%' + (e.local ? ' · ' + esc(e.local) : '') + '</small></span>' +
-        '<span class="chip ' + (e.ativo ? 'ok' : '') + '">' + (e.ativo ? 'Ativo' : 'Inativo') + '</span></button>').join('') || '<div class="vazio">Nenhum termômetro nesta filial.</div>') + '</div>';
-  } else if (S.cadAba === 'us') {
+  if (S.cadAba === 'emp' && admin) {
+    h = '<div class="sec-h" style="margin-top:0"><h3>Empresas</h3><button class="btn pri" type="button" onclick="formEmp()">' + ic('plus') + 'Nova</button></div><div class="lista">' +
+      S.cad.filiais.map(f => '<button class="item' + (f.ativo ? '' : ' pend') + '" type="button" onclick="formEmp(\'' + esc(f.id) + '\')"><span class="ico">' + ic('building') + '</span>' +
+        '<span class="txt"><b>' + esc(f.nome) + '</b><small>' + esc([f.cidade, f.estado].filter(Boolean).join(' / ') || 'Sem cidade') + '</small>' +
+        '<small>' + (f.faixaDefinida ? faixaTxt(f) : '<span style="color:var(--warn)">Faixa não definida (usando ' + faixaTxt(f) + ')</span>') + ' · ' + f.nEquip + ' termôm. · ' + f.nUsu + ' usuár.</small></span>' +
+        '<span class="chip ' + (f.ativo ? 'ok' : '') + '">' + (f.ativo ? 'Ativa' : 'Inativa') + '</span></button>').join('') + '</div>';
+  } else if (S.cadAba === 'eq') {
+    h = '<div class="sec-h" style="margin-top:0"><h3>Termômetros · ' + esc(nomeFil(S.filial)) + '</h3><button class="btn pri" type="button" onclick="formEqCad()">' + ic('plus') + 'Novo</button></div>' +
+      (admin ? '' : '<p class="muted" style="font-size:13px;margin:-2px 2px 10px">Você pode cadastrar novos termômetros da sua empresa. Para alterar ou excluir, fale com um administrador.</p>') +
+      '<div class="lista">' + (eqs.map(e => {
+        const tag = admin ? 'button' : 'div';
+        return '<' + tag + ' class="item' + (e.ativo ? '' : ' pend') + (admin ? '' : ' static') + '"' + (admin ? ' type="button" onclick="formEqCad(\'' + esc(e.id) + '\')"' : '') + '>' +
+          '<span class="ico">' + ic('thermo') + '</span><span class="txt"><b>' + esc(e.descricao) + '</b>' +
+          '<small>' + faixaTxt(e) + ' · ' + (e.faixaPropria ? 'faixa própria' : 'faixa da empresa') + (e.local ? ' · ' + esc(e.local) : '') + '</small></span>' +
+          '<span class="chip ' + (e.ativo ? 'ok' : '') + '">' + (e.ativo ? 'Ativo' : 'Inativo') + '</span></' + tag + '>';
+      }).join('') || '<div class="vazio">Nenhum termômetro nesta empresa.</div>') + '</div>';
+  } else if (S.cadAba === 'us' && admin) {
     h = '<div class="sec-h" style="margin-top:0"><h3>Usuários</h3><button class="btn pri" type="button" onclick="formUsCad()">' + ic('plus') + 'Novo</button></div><div class="lista">' +
       S.cad.usuarios.map(u => '<button class="item" type="button" onclick="formUsCad(\'' + esc(u.id) + '\')"><span class="ico" style="font-weight:700">' + esc((u.nome || '?')[0]) + '</span><span class="txt"><b>' + esc(u.nome) + '</b>' +
         '<small>' + esc(u.email) + ' · ' + esc(nomeFil(u.filial)) + (u.temSenha ? '' : ' · ainda sem senha') + '</small></span>' +
@@ -853,41 +924,102 @@ function desenharCad() {
   } else {
     const ativos = eqs.filter(e => e.ativo);
     h = '<div class="sec-h" style="margin-top:0"><h3>Etiquetas · ' + esc(nomeFil(S.filial)) + '</h3><button class="btn pri" type="button" onclick="window.print()">' + ic('print') + 'Imprimir</button></div>' +
-      '<div id="etqArea"><div class="etq">' + ativos.map(e => '<div><img alt="QR" src="' + esc(e.imagem || ('https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(e.id))) + '"><b>' + esc(e.descricao) + '</b><small>' + esc(nomeFil(e.filial)) + ' · ' + esc(e.id) + '</small></div>').join('') + '</div></div>';
+      '<div id="etqArea"><div class="etq">' + ativos.map(e => '<div><img alt="QR" loading="lazy" src="' + esc(e.imagem || ('https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(e.id))) + '"><b>' + esc(e.descricao) + '</b><small>' + esc(nomeFil(e.filial)) + ' · ' + esc(e.id) + '</small></div>').join('') + '</div></div>';
   }
   $('#cRes').innerHTML = h;
 }
 
-function formEqCad(id) {
-  const F = S.cad.faixaPadrao;
-  const e = id ? S.cad.equipamentos.find(x => x.id === id) : { descricao: '', local: '', filial: S.filial, tmin: F.TEMP_MIN, tmax: F.TEMP_MAX, umin: F.UMID_MIN, umax: F.UMID_MAX, ativo: true };
-  const nv = v => (v == null ? '' : String(v).replace('.', ','));
-  modal(id ? 'Editar termômetro' : 'Novo termômetro',
-    '<label>Descrição<input id="eDesc" value="' + esc(e.descricao) + '" placeholder="Ex.: Termômetro 10 - Câmara fria"></label>' +
-    '<label>Local<input id="eLoc" value="' + esc(e.local) + '" placeholder="Ex.: Armazém, corredor B"></label>' +
-    '<label>Filial<select id="eFil">' + S.cad.filiais.map(f => '<option value="' + esc(f.id) + '"' + (f.id === e.filial ? ' selected' : '') + '>' + esc(f.nome) + '</option>').join('') + '</select></label>' +
-    '<div class="grp">Faixa aceitável</div><div class="grade2">' +
-    '<label>Temp. mínima (°C)<input id="eTmin" inputmode="decimal" value="' + nv(e.tmin) + '"></label><label>Temp. máxima (°C)<input id="eTmax" inputmode="decimal" value="' + nv(e.tmax) + '"></label>' +
-    '<label>Umid. mínima (%)<input id="eUmin" inputmode="decimal" value="' + nv(e.umin) + '"></label><label>Umid. máxima (%)<input id="eUmax" inputmode="decimal" value="' + nv(e.umax) + '"></label></div>' +
-    '<label class="chk"><input type="checkbox" id="eAtivo"' + (e.ativo ? ' checked' : '') + '> Ativo (aparece na coleta)</label>' +
-    (id ? '<p class="muted" style="font-size:12.5px">ID / QR: ' + esc(id) + '</p>' : '<p class="muted" style="font-size:12.5px">O QR Code é gerado automaticamente ao salvar.</p>'),
-    '<button class="btn" type="button" onclick="fecharModal()">Cancelar</button><button class="btn pri" type="button" id="eBtn" onclick="salvarEqCad(\'' + esc(id || '') + '\')">Salvar</button>');
-}
-function salvarEqCad(id) {
-  const d = { id: id || '', descricao: $('#eDesc').value, local: $('#eLoc').value, filial: $('#eFil').value,
-    tmin: pnum($('#eTmin').value), tmax: pnum($('#eTmax').value), umin: pnum($('#eUmin').value), umax: pnum($('#eUmax').value), ativo: $('#eAtivo').checked };
-  $('#eBtn').disabled = true;
-  api('salvarEquipamento', S.token, d).then(() => { fecharModal(); toast('Termômetro salvo.', 'ok'); renderCadastros(); carregar(false); })
-    .catch(err => { toast(err.message, 'bad'); $('#eBtn').disabled = false; });
+function aposCadastro(msg) {
+  fecharModal(); toast(msg, 'ok'); limparMemo();
+  recarregarCad(); carregar('refresh');
 }
 
+/* ---------- Empresas ---------- */
+function formEmp(id) {
+  const F = S.cad.faixaPadrao;
+  const f = id ? S.cad.filiais.find(x => x.id === id)
+    : { nome: '', cidade: '', estado: '', tmin: F.TEMP_MIN, tmax: F.TEMP_MAX, umin: F.UMID_MIN, umax: F.UMID_MAX, ativo: true, faixaDefinida: true };
+  modal(id ? 'Editar empresa' : 'Nova empresa',
+    '<label>Nome<input id="fNome" value="' + esc(f.nome) + '" placeholder="Ex.: FILIAL 20"></label>' +
+    '<div class="grade2"><label>Cidade<input id="fCid" value="' + esc(f.cidade) + '"></label><label>Estado<input id="fUf" value="' + esc(f.estado) + '"></label></div>' +
+    '<div class="grp">Parâmetros de temperatura e umidade</div>' +
+    '<p class="muted" style="font-size:12.5px;margin:-2px 0 8px">Valem para todos os termômetros desta empresa que não tenham faixa própria.</p>' +
+    (f.faixaDefinida ? '' : '<div class="aviso">Esta empresa ainda não tem parâmetros. Os valores abaixo são o padrão do sistema — ajuste e salve.</div>') +
+    '<div class="grade2">' +
+    '<label>Temperatura mínima (°C)<input id="fTmin" inputmode="decimal" value="' + nv(f.tmin) + '"></label><label>Temperatura máxima (°C)<input id="fTmax" inputmode="decimal" value="' + nv(f.tmax) + '"></label>' +
+    '<label>Umidade mínima (%)<input id="fUmin" inputmode="decimal" value="' + nv(f.umin) + '"></label><label>Umidade máxima (%)<input id="fUmax" inputmode="decimal" value="' + nv(f.umax) + '"></label></div>' +
+    '<label class="chk"><input type="checkbox" id="fAtivo"' + (f.ativo ? ' checked' : '') + '> Ativa</label>' +
+    (id ? '<p class="muted" style="font-size:12.5px">' + f.nEquip + ' termômetro(s) · ' + f.nUsu + ' usuário(s) · ID ' + esc(id) + '</p>' +
+      '<button class="btn perigo full" type="button" onclick="excluirEmp(\'' + esc(id) + '\')">Excluir empresa</button>' : ''),
+    '<button class="btn" type="button" onclick="fecharModal()">Cancelar</button><button class="btn pri" type="button" id="fBtn" onclick="salvarEmp(\'' + esc(id || '') + '\')">Salvar</button>');
+}
+function salvarEmp(id) {
+  const d = { id: id || '', nome: $('#fNome').value, cidade: $('#fCid').value, estado: $('#fUf').value,
+    tmin: pnum($('#fTmin').value), tmax: pnum($('#fTmax').value), umin: pnum($('#fUmin').value), umax: pnum($('#fUmax').value), ativo: $('#fAtivo').checked };
+  $('#fBtn').disabled = true;
+  api('salvarFilial', S.token, d).then(() => aposCadastro('Empresa salva.'))
+    .catch(err => { toast(err.message, 'bad'); $('#fBtn').disabled = false; });
+}
+function excluirEmp(id) {
+  if (!confirm('Excluir esta empresa? Esta ação não pode ser desfeita.')) return;
+  api('excluirFilial', S.token, id).then(() => aposCadastro('Empresa excluída.')).catch(err => toast(err.message, 'bad', null, 6000));
+}
+
+/* ---------- Termômetros ---------- */
+function formEqCad(id) {
+  const admin = S.user.admin;
+  if (id && !admin) return;
+  const e = id ? S.cad.equipamentos.find(x => x.id === id) : { descricao: '', local: '', filial: S.filial, ativo: true, faixaPropria: false };
+  const fil = S.cad.filiais.find(f => f.id === e.filial) || S.cad.filiais[0] || S.cad.faixaPadrao;
+  let corpo = '<label>Descrição<input id="eDesc" value="' + esc(e.descricao) + '" placeholder="Ex.: Termômetro 10 - Câmara fria"></label>' +
+    '<label>Local<input id="eLoc" value="' + esc(e.local) + '" placeholder="Ex.: Armazém, corredor B"></label>';
+  if (admin) {
+    corpo += '<label>Empresa<select id="eFil" onchange="atualizarFaixaEq()">' + opcoesFil(e.filial) + '</select></label>' +
+      '<div class="grp">Faixa aceitável</div>' +
+      '<p class="muted" style="font-size:12.5px;margin:-2px 0 8px" id="eHint"></p><div class="grade2">' +
+      '<label>Temp. mínima (°C)<input id="eTmin" inputmode="decimal" value="' + (e.faixaPropria ? nv(e.tmin) : '') + '"></label>' +
+      '<label>Temp. máxima (°C)<input id="eTmax" inputmode="decimal" value="' + (e.faixaPropria ? nv(e.tmax) : '') + '"></label>' +
+      '<label>Umid. mínima (%)<input id="eUmin" inputmode="decimal" value="' + (e.faixaPropria ? nv(e.umin) : '') + '"></label>' +
+      '<label>Umid. máxima (%)<input id="eUmax" inputmode="decimal" value="' + (e.faixaPropria ? nv(e.umax) : '') + '"></label></div>' +
+      '<label class="chk"><input type="checkbox" id="eAtivo"' + (e.ativo ? ' checked' : '') + '> Ativo (aparece na coleta)</label>';
+  } else {
+    corpo += '<div class="faixa">Empresa: <b>' + esc(fil.nome || '') + '</b><br>Faixa aceitável: <b>' + faixaTxt(fil) + '</b><br><span style="font-size:12.5px">Definida pelo administrador.</span></div>';
+  }
+  corpo += id ? '<p class="muted" style="font-size:12.5px">ID / QR: ' + esc(id) + (e.criadoPor ? ' · cadastrado por ' + esc(e.criadoPor) : '') + '</p>' +
+      '<button class="btn perigo full" type="button" onclick="excluirEqCad(\'' + esc(id) + '\')">Excluir termômetro</button>'
+    : '<p class="muted" style="font-size:12.5px">O QR Code é gerado automaticamente ao salvar.</p>';
+  modal(id ? 'Editar termômetro' : 'Novo termômetro', corpo,
+    '<button class="btn" type="button" onclick="fecharModal()">Cancelar</button><button class="btn pri" type="button" id="eBtn" onclick="salvarEqCad(\'' + esc(id || '') + '\')">Salvar</button>');
+  if (admin) atualizarFaixaEq();
+}
+function atualizarFaixaEq() {
+  const f = S.cad.filiais.find(x => x.id === $('#eFil').value);
+  if (!f) return;
+  $('#eHint').innerHTML = 'Deixe em branco para usar a faixa da empresa: <b>' + faixaTxt(f) + '</b>.';
+  $('#eTmin').placeholder = fN(f.tmin); $('#eTmax').placeholder = fN(f.tmax);
+  $('#eUmin').placeholder = fN(f.umin, 0); $('#eUmax').placeholder = fN(f.umax, 0);
+}
+function salvarEqCad(id) {
+  const admin = S.user.admin;
+  const d = { id: id || '', descricao: $('#eDesc').value, local: $('#eLoc').value, filial: admin ? $('#eFil').value : S.filial };
+  if (admin) Object.assign(d, { tmin: pnum($('#eTmin').value), tmax: pnum($('#eTmax').value), umin: pnum($('#eUmin').value), umax: pnum($('#eUmax').value), ativo: $('#eAtivo').checked });
+  $('#eBtn').disabled = true;
+  api('salvarEquipamento', S.token, d).then(() => aposCadastro('Termômetro salvo.'))
+    .catch(err => { toast(err.message, 'bad'); $('#eBtn').disabled = false; });
+}
+function excluirEqCad(id) {
+  if (!confirm('Excluir este termômetro? Esta ação não pode ser desfeita.')) return;
+  api('excluirEquipamento', S.token, id).then(() => aposCadastro('Termômetro excluído.')).catch(err => toast(err.message, 'bad', null, 6000));
+}
+
+/* ---------- Usuários ---------- */
 function formUsCad(id) {
   const u = id ? S.cad.usuarios.find(x => x.id === id) : { nome: '', email: '', telefone: '', filial: S.filial, perm: 'USER', ativo: true };
   modal(id ? 'Editar usuário' : 'Novo usuário',
     '<label>Nome<input id="uNome" value="' + esc(u.nome) + '"></label>' +
     '<label>E-mail<input id="uEmail" type="email" value="' + esc(u.email) + '"></label>' +
     '<label>Telefone com DDD<input id="uTel" inputmode="tel" value="' + esc(u.telefone) + '"></label>' +
-    '<div class="grade2"><label>Filial<select id="uFil">' + S.cad.filiais.map(f => '<option value="' + esc(f.id) + '"' + (f.id === u.filial ? ' selected' : '') + '>' + esc(f.nome) + '</option>').join('') + '</select></label>' +
+    '<div class="grade2"><label>Empresa<select id="uFil">' + opcoesFil(u.filial) + '</select></label>' +
     '<label>Permissão<select id="uPerm"><option value="USER"' + (u.perm !== 'ADMIN' ? ' selected' : '') + '>Usuário</option><option value="ADMIN"' + (u.perm === 'ADMIN' ? ' selected' : '') + '>Administrador</option></select></label></div>' +
     '<label class="chk"><input type="checkbox" id="uAtivo"' + (u.ativo ? ' checked' : '') + '> Ativo</label>' +
     '<p class="muted" style="font-size:12.5px">' + (id && u.temSenha ? 'Já criou senha. Para um novo primeiro acesso, use "Resetar senha".' : 'No primeiro acesso, a senha é o telefone (só números).') + '</p>' +
@@ -897,12 +1029,12 @@ function formUsCad(id) {
 function salvarUsCad(id) {
   const d = { id: id || '', nome: $('#uNome').value, email: $('#uEmail').value, telefone: $('#uTel').value, filial: $('#uFil').value, perm: $('#uPerm').value, ativo: $('#uAtivo').checked };
   $('#uBtn').disabled = true;
-  api('salvarUsuario', S.token, d).then(() => { fecharModal(); toast('Usuário salvo.', 'ok'); renderCadastros(); })
+  api('salvarUsuario', S.token, d).then(() => { fecharModal(); toast('Usuário salvo.', 'ok'); recarregarCad(); })
     .catch(err => { toast(err.message, 'bad'); $('#uBtn').disabled = false; });
 }
 function resetSenha(id) {
   if (!confirm('Resetar a senha? O usuário vai entrar de novo usando o telefone como senha.')) return;
-  api('resetarSenha', S.token, id).then(() => { fecharModal(); toast('Senha resetada.', 'ok'); renderCadastros(); }).catch(err => toast(err.message, 'bad'));
+  api('resetarSenha', S.token, id).then(() => { fecharModal(); toast('Senha resetada.', 'ok'); recarregarCad(); }).catch(err => toast(err.message, 'bad'));
 }
 
 /* ================== Início ================== */
