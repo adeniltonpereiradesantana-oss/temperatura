@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="theme-color" content="#0e7490">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Controle de Temperatura</title>
+<style>
+:root{
+  --bg:#f3f6fa;--card:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;
+  --pri:#0e7490;--pri2:#0891b2;--pri-s:#e0f2f7;
+  --ok:#15803d;--ok-s:#dcfce7;--warn:#b45309;--warn-s:#fef3c7;--bad:#dc2626;--bad-s:#fee2e2;
+  --r:14px;--sh:0 1px 2px rgba(15,23,42,.06),0 4px 14px rgba(15,23,42,.05);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+.hidden{display:none!important}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ---------- Login ---------- */
+.tela{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
+  background:linear-gradient(160deg,#0e7490 0%,#155e75 55%,#0f172a 100%)}
+.cx-login{width:100%;max-width:380px;background:var(--card);border-radius:20px;padding:28px 22px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.logo{width:56px;height:56px;border-radius:16px;background:var(--pri-s);color:var(--pri);display:grid;place-items:center;margin-bottom:14px}
+.logo svg.i{width:30px;height:30px}
+.cx-login h1{margin:0 0 4px;font-size:22px}
+.cx-login p.sub{margin:0 0 20px;color:var(--muted)}
+.dica{font-size:13px;color:var(--muted);margin-top:14px;text-align:center}
+
+/* ---------- Form ---------- */
+label{display:block;font-size:13px;font-weight:600;color:#334155;margin-bottom:12px}
+input,select,textarea{display:block;width:100%;margin-top:5px;padding:12px;border:1.5px solid var(--line);border-radius:11px;background:#fff;outline:none;font-size:16px}
+input:focus,select:focus,textarea:focus{border-color:var(--pri2);box-shadow:0 0 0 3px rgba(8,145,178,.15)}
+textarea{resize:vertical}
+.chk{display:flex;align-items:center;gap:10px;font-weight:500}
+.chk input{width:22px;height:22px;margin:0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:12px 16px;font-weight:650;cursor:pointer;background:#e2e8f0;color:var(--ink);text-decoration:none}
+.btn:disabled{opacity:.55;cursor:default}
+.btn.pri{background:var(--pri);color:#fff}
+.btn.pri:active{background:#155e75}
+.btn.sec{background:var(--pri-s);color:var(--pri)}
+.btn.perigo{background:var(--bad-s);color:var(--bad)}
+.btn.full{width:100%}
+.btn.grande{width:100%;padding:17px;font-size:17px;border-radius:16px;box-shadow:0 6px 16px rgba(14,116,144,.3)}
+.btn.grande svg.i{width:24px;height:24px}
+.lnk{background:none;border:0;color:var(--pri);font-weight:600;display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:6px}
+.lnk svg.i{width:16px;height:16px}
+.erro{background:var(--bad-s);color:var(--bad);border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:12px}
+
+/* ---------- App shell ---------- */
+.topo{position:sticky;top:0;z-index:20;background:var(--pri);color:#fff;display:flex;align-items:center;gap:10px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top))}
+.marca{display:flex;align-items:center;gap:8px;font-weight:750;font-size:17px;white-space:nowrap}
+@media (max-width:480px){.marca span{display:none}}
+.topo .fil{flex:1;min-width:0;text-align:right}
+.topo .fil span{font-size:13px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.topo select{margin:0;padding:7px 28px 7px 10px;font-size:14px;border:0;border-radius:9px;background:rgba(255,255,255,.16);color:#fff;width:auto;max-width:100%;margin-left:auto}
+.topo select option{color:#111}
+.avatar{width:36px;height:36px;border-radius:50%;border:2px solid rgba(255,255,255,.5);background:rgba(255,255,255,.15);color:#fff;font-weight:700;font-size:13px;cursor:pointer;flex:none}
+main{max-width:980px;margin:0 auto;padding:14px 14px calc(90px + env(safe-area-inset-bottom))}
+.abas{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+.abas button{flex:1;background:none;border:0;padding:8px 2px 9px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer}
+.abas button.on{color:var(--pri)}
+.abas button.on svg.i{stroke-width:2.4}
+@media (min-width:900px){
+  .abas{position:sticky;top:56px;bottom:auto;max-width:980px;margin:0 auto;border:0;background:transparent;padding:12px 14px 0;gap:6px}
+  .abas button{flex:none;flex-direction:row;gap:7px;font-size:14px;padding:9px 14px;border-radius:10px}
+  .abas button.on{background:var(--pri-s)}
+  main{padding-bottom:40px}
+}
+
+/* ---------- Cards e listas ---------- */
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:16px;margin-bottom:14px}
+.turno small{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em;font-size:12px}
+.turno h2{margin:4px 0 12px;font-size:20px}
+.prog{height:9px;background:#e2e8f0;border-radius:9px;overflow:hidden}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--pri2),#22c55e);border-radius:9px;transition:width .4s}
+.sec-h{display:flex;align-items:center;justify-content:space-between;margin:20px 2px 8px}
+.sec-h h3{margin:0;font-size:16px}
+.lista{display:flex;flex-direction:column;gap:8px}
+.item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card);border:1.5px solid transparent;border-radius:var(--r);box-shadow:var(--sh);padding:13px 12px;cursor:pointer}
+.item:active{transform:scale(.99)}
+.item .ico{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:#f1f5f9;color:var(--muted);flex:none}
+.item.ok .ico{background:var(--ok-s);color:var(--ok)}
+.item.bad{border-color:#fecaca}
+.item.bad .ico{background:var(--bad-s);color:var(--bad)}
+.item .txt{flex:1;min-width:0}
+.item .txt b{display:block;font-size:15.5px}
+.item .txt small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.chip{font-size:12px;font-weight:700;padding:4px 9px;border-radius:20px;white-space:nowrap;background:#f1f5f9;color:var(--muted)}
+.chip.ok{background:var(--ok-s);color:var(--ok)}
+.chip.bad{background:var(--bad-s);color:var(--bad)}
+.chip.warn{background:var(--warn-s);color:var(--warn)}
+.chip.pri{background:var(--pri-s);color:var(--pri)}
+.vazio{text-align:center;color:var(--muted);padding:30px 10px}
+.muted{color:var(--muted)}
+.center{text-align:center}
+
+/* ---------- Histórico ---------- */
+.grade2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.grade3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 8px}
+.span2{grid-column:1/-1}
+@media (max-width:520px){.filtros .grade3{grid-template-columns:1fr 1fr}.filtros .grade3 .span3m{grid-column:1/-1}}
+.resumo{display:flex;gap:8px;flex-wrap:wrap;margin:4px 2px 4px}
+.dia{margin:18px 4px 8px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.hist{background:var(--card);border-radius:12px;box-shadow:var(--sh);padding:11px 12px;display:flex;gap:10px;align-items:flex-start;border-left:4px solid var(--ok)}
+.hist.bad{border-left-color:var(--bad)}
+.hist .a{flex:1;min-width:0}
+.hist .a b{font-size:15px}
+.hist .a small{display:block;color:var(--muted);font-size:12.5px}
+.hist .v{text-align:right;white-space:nowrap}
+.hist .v strong{font-size:18px;display:block}
+.hist .v span{font-size:12.5px;color:var(--muted)}
+.al{color:var(--bad);font-size:12.5px;font-weight:600;margin-top:4px}
+.ob{font-size:12.5px;color:#334155;margin-top:4px;background:#f8fafc;border-radius:7px;padding:5px 7px}
+
+/* ---------- Painel ---------- */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chips button{border:1.5px solid var(--line);background:#fff;border-radius:20px;padding:7px 13px;font-weight:600;font-size:13.5px;cursor:pointer}
+.chips button.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+@media (min-width:700px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);padding:13px}
+.kpi small{color:var(--muted);font-size:12px;font-weight:600}
+.kpi b{display:block;font-size:24px;margin-top:2px}
+.kpi.bad b{color:var(--bad)}.kpi.ok b{color:var(--ok)}
+.graf{position:relative;height:260px}
+.card h3{margin:0 0 10px;font-size:15px}
+.tab-w{overflow-x:auto;margin:0 -16px;padding:0 16px}
+table.t{width:100%;border-collapse:collapse;font-size:13.5px;min-width:560px}
+table.t th{text-align:left;color:var(--muted);font-size:12px;font-weight:700;padding:8px 6px;border-bottom:1.5px solid var(--line);white-space:nowrap}
+table.t td{padding:9px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.barra{display:inline-block;width:56px;height:7px;background:#e2e8f0;border-radius:6px;overflow:hidden;vertical-align:middle;margin-right:6px}
+.barra i{display:block;height:100%;background:var(--pri2)}
+
+/* ---------- Modal ---------- */
+.modal{position:fixed;inset:0;z-index:50;background:rgba(15,23,42,.5);display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--card);width:100%;max-width:560px;max-height:94vh;border-radius:20px 20px 0 0;display:flex;flex-direction:column;animation:sobe .22s ease}
+@media (min-width:700px){.modal{align-items:center}.sheet{border-radius:20px}}
+@keyframes sobe{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.sheet-h{display:flex;align-items:center;gap:10px;padding:16px 16px 8px}
+.sheet-h h3{flex:1;margin:0;font-size:18px}
+.sheet-h .x{width:36px;height:36px;border-radius:50%;border:0;background:#f1f5f9;font-size:22px;line-height:1;cursor:pointer}
+.sheet-b{padding:6px 16px 10px;overflow-y:auto}
+.sheet-f{display:flex;gap:10px;padding:12px 16px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.sheet-f .btn{flex:1}
+.faixa{background:var(--pri-s);color:#155e75;border-radius:10px;padding:9px 11px;font-size:13.5px;margin-bottom:12px}
+.aviso{background:var(--warn-s);color:var(--warn);border-radius:10px;padding:9px 11px;font-size:13.5px;margin-bottom:12px;font-weight:600}
+.grp{font-size:13px;font-weight:800;color:var(--pri);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 6px}
+.num input{font-size:20px;font-weight:700;text-align:center;padding:12px 6px}
+.num input.fora{border-color:var(--bad);background:#fff5f5;color:var(--bad)}
+.req{color:var(--bad);font-weight:600}
+.box-al{background:var(--bad-s);color:var(--bad);border-radius:10px;padding:10px 12px;font-size:13.5px;margin-bottom:12px}
+.box-al b{display:block;margin-bottom:3px}
+.box-al ul{margin:0;padding-left:18px}
+#leitor{width:100%;border-radius:14px;overflow:hidden;background:#0f172a;min-height:240px}
+#leitor video{width:100%!important;border-radius:14px}
+
+/* ---------- Toast / loading ---------- */
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;width:calc(100% - 28px);max-width:440px;pointer-events:none}
+.ts{background:#0f172a;color:#fff;border-radius:12px;padding:12px 14px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;pointer-events:auto;animation:sobe .2s ease}
+.ts.ok{background:#14532d}.ts.bad{background:#991b1b}.ts.warn{background:#92400e}
+.ts span{flex:1}
+.ts button{background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:8px;padding:7px 10px;font-weight:700;cursor:pointer}
+#carregando{position:fixed;inset:0;z-index:70;background:rgba(243,246,250,.6);display:grid;place-items:center}
+.spin{width:38px;height:38px;border:4px solid var(--pri-s);border-top-color:var(--pri);border-radius:50%;animation:gira .8s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+
+/* ---------- Cadastros / etiquetas ---------- */
+.seg{display:flex;background:#e2e8f0;border-radius:12px;padding:4px;margin-bottom:14px}
+.seg button{flex:1;border:0;background:none;padding:9px 4px;border-radius:9px;font-weight:650;font-size:13.5px;cursor:pointer;color:#475569}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:var(--sh)}
+.etq{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.etq div{background:#fff;border:1px dashed #94a3b8;border-radius:12px;padding:12px;text-align:center}
+.etq img{width:120px;height:120px;display:block;margin:0 auto 6px}
+.etq b{display:block;font-size:13px}
+.etq small{font-size:11px;color:var(--muted)}
+@media print{
+  body *{visibility:hidden}
+  #etqArea,#etqArea *{visibility:visible}
+  #etqArea{position:absolute;left:0;top:0;width:100%}
+  .etq{grid-template-columns:repeat(3,1fr)}
+  .etq div{break-inside:avoid}
+}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="tela-login" class="tela hidden">
+  <form class="cx-login" id="fLogin" autocomplete="on">
+    <div class="logo" id="logoLogin"></div>
+    <h1>Controle de Temperatura</h1>
+    <p class="sub">Registro de temperatura e umidade por filial</p>
+    <div id="lErro" class="erro hidden"></div>
+    <label>E-mail<input type="email" id="lEmail" autocomplete="username" required></label>
+    <label>Senha<input type="password" id="lSenha" autocomplete="current-password" required></label>
+    <button class="btn pri full" id="lBtn" type="submit">Entrar</button>
+    <p class="dica">Primeiro acesso: a senha é o seu telefone com DDD, só números.</p>
+  </form>
+</div>
+
+<!-- ============ NOVA SENHA (primeiro acesso) ============ -->
+<div id="tela-senha" class="tela hidden">
+  <form class="cx-login" id="fSenha">
+    <div class="logo" id="logoSenha"></div>
+    <h1>Crie sua senha</h1>
+    <p class="sub">É o seu primeiro acesso. Escolha uma senha com pelo menos 6 caracteres.</p>
+    <div id="sErro" class="erro hidden"></div>
+    <label>Nova senha<input type="password" id="sNova" autocomplete="new-password" required minlength="6"></label>
+    <label>Repita a senha<input type="password" id="sConf" autocomplete="new-password" required minlength="6"></label>
+    <button class="btn pri full" id="sBtn" type="submit">Salvar e entrar</button>
+  </form>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="tela-app" class="hidden">
+  <header class="topo">
+    <div class="marca" id="marca"></div>
+    <div class="fil"><select id="selFilial" class="hidden"></select><span id="filNome"></span></div>
+    <button class="avatar" id="btnUser" title="Conta"></button>
+  </header>
+  <nav class="abas" id="abas"></nav>
+  <main>
+    <section id="v-coleta"></section>
+    <section id="v-historico" class="hidden"></section>
+    <section id="v-painel" class="hidden"></section>
+    <section id="v-relatorio" class="hidden"></section>
+    <section id="v-cadastros" class="hidden"></section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="sheet">
+    <div class="sheet-h"><h3 id="mTit"></h3><button class="x" type="button" onclick="fecharModal()">×</button></div>
+    <div class="sheet-b" id="mCorpo"></div>
+    <div class="sheet-f" id="mPe"></div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="carregando" class="hidden"><div class="spin"></div></div>
+
+<script>
+/* ================== Base ================== */
+const TZ = 'America/Sao_Paulo';
+const S = { token: null, user: null, filial: null, ini: null, view: 'coleta', senhaLogin: '', charts: {}, cad: null, cadAba: 'eq', painelDias: 7, painelSerie: 'tMax' };
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fN = (v, d = 1) => (v == null || v === '' || isNaN(v)) ? '–' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fDT = ts => new Date(ts).toLocaleString('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const fH = ts => new Date(ts).toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
+const fD = ts => new Date(ts).toLocaleDateString('pt-BR', { timeZone: TZ, weekday: 'long', day: '2-digit', month: '2-digit' });
+const hojeISO = (off = 0) => new Date(Date.now() + off * 864e5).toLocaleDateString('en-CA', { timeZone: TZ });
+const pnum = v => { if (v == null) return null; const s = String(v).trim().replace(',', '.'); if (s === '' || s === '-') return null; const n = Number(s); return isNaN(n) ? null : n; };
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+
+const IC = {
+  thermo: '<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>',
+  qr: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="4" height="4"/><rect x="13" y="13" width="4" height="4"/><path d="M13 7h4v4M7 13v4h4"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
+  cfg: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  alert: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  print: '<path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+  ext: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"/>'
+};
+const ic = n => '<svg class="i" viewBox="0 0 24 24">' + (IC[n] || '') + '</svg>';
+
+/* Endereço do app web (termina em /exec). Usado quando esta página é aberta
+   fora do Apps Script — é assim que a câmera funciona no celular. */
+const API_URL = 'COLE_AQUI_A_URL_DO_APP_WEB';
+const DENTRO_APPS_SCRIPT = !!(window.google && google.script && google.script.run);
+
+function api(fn, ...args) {
+  const erro = (e, rej) => {
+    const m = String((e && e.message) || e).replace(/^(Exception|Error):\s*/, '');
+    if (m.indexOf('SESSAO_EXPIRADA') >= 0) { sessaoExpirada(); return rej(new Error('Sua sessão expirou. Entre novamente.')); }
+    rej(new Error(m));
+  };
+  return new Promise((res, rej) => {
+    if (DENTRO_APPS_SCRIPT) {
+      google.script.run.withSuccessHandler(res).withFailureHandler(e => erro(e, rej))[fn](...args);
+      return;
+    }
+    fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args }) })
+      .then(r => r.json())
+      .then(r => (r.ok ? res(r.data) : erro(r.erro, rej)))
+      .catch(() => erro('Sem conexão com o servidor. Verifique a internet e tente de novo.', rej));
+  });
+}
+
+let busyN = 0;
+function busy(on) { busyN = Math.max(0, busyN + (on ? 1 : -1)); $('#carregando').classList.toggle('hidden', busyN === 0); }
+
+function toast(msg, tipo = '', acao = null, ms = 3500) {
+  const el = document.createElement('div');
+  el.className = 'ts ' + tipo;
+  el.innerHTML = '<span>' + esc(msg) + '</span>' + (acao ? '<button type="button">' + esc(acao.txt) + '</button>' : '');
+  if (acao) el.querySelector('button').onclick = () => { el.remove(); acao.fn(); };
+  $('#toast').appendChild(el);
+  setTimeout(() => el.remove(), acao ? 7000 : ms);
+}
+
+let onCloseModal = null;
+function modal(tit, corpo, pe, onClose) {
+  $('#mTit').textContent = tit;
+  $('#mCorpo').innerHTML = corpo;
+  $('#mPe').innerHTML = pe || '';
+  $('#mPe').classList.toggle('hidden', !pe);
+  onCloseModal = onClose || null;
+  $('#modal').classList.remove('hidden');
+  $('#mCorpo').scrollTop = 0;
+}
+function fecharModal() {
+  const f = onCloseModal; onCloseModal = null;
+  if (f) try { f(); } catch (e) {}
+  $('#modal').classList.add('hidden');
+}
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') fecharModal(); });
+
+function mostrar(tela) {
+  ['login', 'senha', 'app'].forEach(t => $('#tela-' + t).classList.toggle('hidden', t !== tela));
+}
+
+/* ================== Login ================== */
+$('#logoLogin').innerHTML = ic('thermo');
+$('#logoSenha').innerHTML = ic('thermo');
+$('#marca').innerHTML = ic('thermo') + '<span>Temperatura</span>';
+
+$('#fLogin').addEventListener('submit', e => {
+  e.preventDefault();
+  const email = $('#lEmail').value.trim(), senha = $('#lSenha').value;
+  $('#lErro').classList.add('hidden');
+  $('#lBtn').disabled = true; $('#lBtn').textContent = 'Entrando…';
+  api('login', email, senha).then(r => {
+    S.token = r.token; S.user = r.usuario; store.set('tmp_token', r.token); store.set('tmp_email', email);
+    if (r.trocarSenha) { S.senhaLogin = senha; mostrar('senha'); setTimeout(() => $('#sNova').focus(), 100); }
+    else entrarApp();
+  }).catch(err => {
+    $('#lErro').textContent = err.message; $('#lErro').classList.remove('hidden');
+  }).finally(() => { $('#lBtn').disabled = false; $('#lBtn').textContent = 'Entrar'; });
+});
+
+$('#fSenha').addEventListener('submit', e => {
+  e.preventDefault();
+  const a = $('#sNova').value, b = $('#sConf').value;
+  const er = $('#sErro');
+  er.classList.add('hidden');
+  if (a !== b) { er.textContent = 'As senhas não conferem.'; er.classList.remove('hidden'); return; }
+  $('#sBtn').disabled = true;
+  api('trocarSenha', S.token, S.senhaLogin, a).then(() => {
+    S.senhaLogin = ''; toast('Senha criada!', 'ok'); entrarApp();
+  }).catch(err => { er.textContent = err.message; er.classList.remove('hidden'); })
+    .finally(() => { $('#sBtn').disabled = false; });
+});
+
+function sessaoExpirada() {
+  store.del('tmp_token'); S.token = null; S.ini = null;
+  fecharModal(); mostrar('login');
+}
+function sair() {
+  const t = S.token;
+  sessaoExpirada();
+  if (t) api('sair', t).catch(() => {});
+}
+
+/* ================== App ================== */
+function entrarApp() {
+  mostrar('app');
+  carregar(true);
+}
+
+function carregar(primeira) {
+  busy(true);
+  return api('carregarInicio', S.token, S.filial).then(d => {
+    S.ini = d; S.user = d.usuario; S.filial = d.filial; store.set('tmp_filial', d.filial);
+    montarTopo(); montarAbas();
+    if (primeira) irPara(S.view);
+    else { renderColeta(); if (S.view !== 'coleta') irPara(S.view); }
+  }).catch(err => { if (S.token) toast(err.message, 'bad'); }).finally(() => busy(false));
+}
+
+function montarTopo() {
+  const d = S.ini, sel = $('#selFilial'), nome = $('#filNome');
+  const ini = (d.usuario.nome || '?').split(/\s+/).filter(Boolean);
+  $('#btnUser').textContent = ((ini[0] || '?')[0] + (ini.length > 1 ? ini[ini.length - 1][0] : '')).toUpperCase();
+  const fil = d.filiais.find(f => f.id === d.filial);
+  if (d.usuario.admin && d.filiais.length > 1) {
+    sel.innerHTML = d.filiais.map(f => '<option value="' + esc(f.id) + '"' + (f.id === d.filial ? ' selected' : '') + '>' + esc(f.nome + (f.cidade ? ' · ' + f.cidade : '')) + '</option>').join('');
+    sel.classList.remove('hidden'); nome.classList.add('hidden');
+  } else {
+    sel.classList.add('hidden'); nome.classList.remove('hidden');
+    nome.textContent = fil ? fil.nome + (fil.cidade ? ' · ' + fil.cidade : '') : '';
+  }
+}
+$('#selFilial').addEventListener('change', e => {
+  S.filial = e.target.value;
+  ['v-historico', 'v-painel', 'v-relatorio'].forEach(id => { delete document.getElementById(id).dataset.ok; });
+  carregar(false);
+});
+$('#btnUser').addEventListener('click', menuConta);
+
+const VIEWS = [
+  { id: 'coleta', nome: 'Coleta', ic: 'thermo' },
+  { id: 'historico', nome: 'Histórico', ic: 'clock' },
+  { id: 'painel', nome: 'Painel', ic: 'chart' },
+  { id: 'relatorio', nome: 'Relatório', ic: 'file' },
+  { id: 'cadastros', nome: 'Cadastros', ic: 'cfg', admin: true }
+];
+function montarAbas() {
+  $('#abas').innerHTML = VIEWS.filter(v => !v.admin || S.user.admin)
+    .map(v => '<button type="button" data-v="' + v.id + '"' + (v.id === S.view ? ' class="on"' : '') + '>' + ic(v.ic) + '<span>' + v.nome + '</span></button>').join('');
+  $('#abas').querySelectorAll('button').forEach(b => b.onclick = () => irPara(b.dataset.v));
+}
+function irPara(v) {
+  if (v === 'cadastros' && !S.user.admin) v = 'coleta';
+  S.view = v;
+  VIEWS.forEach(x => $('#v-' + x.id).classList.toggle('hidden', x.id !== v));
+  $('#abas').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  window.scrollTo(0, 0);
+  ({ coleta: renderColeta, historico: renderHistorico, painel: renderPainel, relatorio: renderRelatorio, cadastros: renderCadastros })[v]();
+}
+
+function menuConta() {
+  const u = S.user;
+  modal('Minha conta',
+    '<p style="margin:0 0 4px"><b>' + esc(u.nome) + '</b></p><p class="muted" style="margin:0 0 14px">' + esc(u.email) + ' · ' + (u.admin ? 'Administrador' : 'Usuário') + '</p>' +
+    '<button class="btn sec full" type="button" onclick="formSenha()">Trocar senha</button><div style="height:10px"></div>' +
+    '<button class="btn perigo full" type="button" onclick="sair()">Sair</button>');
+}
+function formSenha() {
+  modal('Trocar senha',
+    '<div id="tsErro" class="erro hidden"></div><label>Senha atual<input type="password" id="tsA"></label><label>Nova senha<input type="password" id="tsN" minlength="6"></label><label>Repita a nova senha<input type="password" id="tsC"></label>',
+    '<button class="btn" type="button" onclick="fecharModal()">Cancelar</button><button class="btn pri" type="button" id="tsBtn" onclick="salvarSenha()">Salvar</button>');
+}
+function salvarSenha() {
+  const a = $('#tsA').value, n = $('#tsN').value, c = $('#tsC').value, er = $('#tsErro');
+  if (n !== c) { er.textContent = 'As senhas não conferem.'; er.classList.remove('hidden'); return; }
+  $('#tsBtn').disabled = true;
+  api('trocarSenha', S.token, a, n).then(() => { fecharModal(); toast('Senha alterada.', 'ok'); })
+    .catch(err => { er.textContent = err.message; er.classList.remove('hidden'); $('#tsBtn').disabled = false; });
+}
+
+/* ================== Coleta ================== */
+function statusEq(e) {
+  if (e.lidoTurno && e.alertas.length) return { cls: 'bad', txt: 'Fora da faixa' };
+  if (e.lidoTurno) return { cls: 'ok', txt: 'Lido' };
+  return { cls: 'pend', txt: 'Pendente' };
+}
+
+function renderColeta() {
+  const d = S.ini; if (!d) return;
+  const eqs = d.equipamentos;
+  const lidos = eqs.filter(e => e.lidoTurno).length;
+  const pct = eqs.length ? Math.round(lidos / eqs.length * 100) : 0;
+  const foraT = eqs.filter(e => e.lidoTurno && e.alertas.length).length;
+  $('#v-coleta').innerHTML =
+    '<div class="card turno"><small>Turno ' + esc(d.turno.nome.toLowerCase()) + ' · ' + esc(fD(d.agora)) + '</small>' +
+    '<h2>' + lidos + ' de ' + eqs.length + ' termômetros lidos</h2><div class="prog"><i style="width:' + pct + '%"></i></div>' +
+    (foraT ? '<p class="al" style="margin:10px 0 0">' + foraT + ' leitura(s) fora da faixa neste turno</p>' : '') + '</div>' +
+    '<button class="btn pri grande" type="button" onclick="abrirScanner()">' + ic('qr') + 'Escanear QR do termômetro</button>' +
+    '<div class="sec-h"><h3>Termômetros</h3><button class="lnk" type="button" onclick="carregar(false)">' + ic('refresh') + 'Atualizar</button></div>' +
+    '<div class="lista">' + (eqs.map(itemEq).join('') || '<div class="vazio">Nenhum termômetro ativo nesta filial.</div>') + '</div>';
+}
+
+function itemEq(e) {
+  const st = statusEq(e), l = e.ultima;
+  const info = l ? 'Última: ' + fN(l.t) + ' °C · ' + fN(l.u, 0) + '% · ' + fDT(l.ts) : 'Sem leitura nos últimos 7 dias';
+  return '<button class="item ' + st.cls + '" type="button" onclick="abrirForm(\'' + esc(e.id) + '\')">' +
+    '<span class="ico">' + ic(st.cls === 'bad' ? 'alert' : st.cls === 'ok' ? 'check' : 'thermo') + '</span>' +
+    '<span class="txt"><b>' + esc(e.descricao) + '</b><small>' + esc(info) + (e.local ? ' · ' + esc(e.local) : '') + '</small></span>' +
+    '<span class="chip ' + st.cls + '">' + st.txt + '</span></button>';
+}
+
+function alertasC(l, e) {
+  const a = [];
+  const chk = (v, min, max, rot, un, c) => {
+    if (v == null) return;
+    if (v > max) a.push(rot + ' ' + fN(v, c) + un + ' acima de ' + fN(max, c) + un);
+    else if (v < min) a.push(rot + ' ' + fN(v, c) + un + ' abaixo de ' + fN(min, c) + un);
+  };
+  chk(l.t, e.tmin, e.tmax, 'Temperatura', ' °C', 1);
+  chk(l.tmax, e.tmin, e.tmax, 'Temp. máxima', ' °C', 1);
+  chk(l.tmin, e.tmin, e.tmax, 'Temp. mínima', ' °C', 1);
+  chk(l.u, e.umin, e.umax, 'Umidade', '%', 0);
+  chk(l.umax, e.umin, e.umax, 'Umid. máxima', '%', 0);
+  chk(l.umin, e.umin, e.umax, 'Umid. mínima', '%', 0);
+  return a;
+}
+
+const CAMPOS = ['t', 'tmax', 'tmin', 'u', 'umax', 'umin'];
+let formEq = null;
+
+function abrirForm(id) {
+  const e = S.ini.equipamentos.find(x => x.id === id);
+  if (!e) return toast('Termômetro não encontrado nesta filial.', 'bad');
+  formEq = e;
+  const campo = (k, rot) => '<label class="num">' + rot + '<input id="f_' + k + '" inputmode="decimal" autocomplete="off" placeholder="0,0"></label>';
+  modal(e.descricao,
+    '<div class="faixa">Faixa aceitável: <b>' + fN(e.tmin) + ' a ' + fN(e.tmax) + ' °C</b> · <b>' + fN(e.umin, 0) + ' a ' + fN(e.umax, 0) + '%</b>' + (e.local ? '<br>Local: ' + esc(e.local) : '') + '</div>' +
+    (e.lidoTurno ? '<div class="aviso">Já existe leitura neste turno (' + fH(e.ultima.ts) + '). Salvar vai registrar uma nova.</div>' : '') +
+    '<div class="grp">Temperatura (°C)</div><div class="grade3">' + campo('t', 'Atual') + campo('tmax', 'Máxima') + campo('tmin', 'Mínima') + '</div>' +
+    '<div class="grp">Umidade (%)</div><div class="grade3">' + campo('u', 'Atual') + campo('umax', 'Máxima') + campo('umin', 'Mínima') + '</div>' +
+    '<div id="fAl"></div>' +
+    '<label>Observação <span id="obsReq" class="req hidden">· obrigatória: descreva a ação tomada</span><textarea id="f_obs" rows="2" maxlength="500" placeholder="Opcional"></textarea></label>',
+    '<button class="btn" type="button" onclick="fecharModal()">Cancelar</button><button class="btn pri" type="button" id="fBtn" onclick="salvarLeitura()">Salvar leitura</button>',
+    () => { formEq = null; });
+  CAMPOS.forEach((k, i) => {
+    const inp = $('#f_' + k);
+    inp.addEventListener('input', validarForm);
+    inp.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') { ev.preventDefault(); const nx = CAMPOS[i + 1] ? $('#f_' + CAMPOS[i + 1]) : $('#f_obs'); nx.focus(); }
+    });
+  });
+  setTimeout(() => { const f = $('#f_t'); if (f) f.focus(); }, 250);
+}
+
+function lerForm() {
+  const l = {};
+  CAMPOS.forEach(k => { l[k] = pnum($('#f_' + k).value); });
+  return l;
+}
+
+function validarForm() {
+  const e = formEq; if (!e) return [];
+  const l = lerForm();
+  const al = alertasC(l, e);
+  const logic = [];
+  if (l.tmin != null && l.tmax != null && l.tmin > l.tmax) logic.push('A temperatura mínima está maior que a máxima.');
+  if (l.umin != null && l.umax != null && l.umin > l.umax) logic.push('A umidade mínima está maior que a máxima.');
+  if (l.t != null && l.tmax != null && l.t > l.tmax) logic.push('A temperatura atual está acima da máxima informada.');
+  if (l.t != null && l.tmin != null && l.t < l.tmin) logic.push('A temperatura atual está abaixo da mínima informada.');
+  CAMPOS.forEach(k => {
+    const v = l[k], isT = k[0] === 't';
+    const fora = v != null && (isT ? (v > e.tmax || v < e.tmin) : (v > e.umax || v < e.umin));
+    $('#f_' + k).classList.toggle('fora', fora);
+  });
+  let h = '';
+  if (al.length) h += '<div class="box-al"><b>Fora da faixa</b><ul>' + al.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>';
+  if (logic.length) h += '<div class="aviso">' + logic.map(esc).join('<br>') + '</div>';
+  $('#fAl').innerHTML = h;
+  $('#obsReq').classList.toggle('hidden', !al.length);
+  $('#f_obs').placeholder = al.length ? 'Ex.: ar-condicionado ajustado, avisado o farmacêutico…' : 'Opcional';
+  return al;
+}
+
+function salvarLeitura() {
+  const e = formEq; if (!e) return;
+  const l = lerForm();
+  const falta = CAMPOS.filter(k => l[k] == null);
+  if (falta.length) { $('#f_' + falta[0]).focus(); return toast('Preencha todos os campos de temperatura e umidade.', 'warn'); }
+  const al = validarForm();
+  const obs = $('#f_obs').value.trim();
+  if (al.length && obs.length < 5) { $('#f_obs').focus(); return toast('Leitura fora da faixa: descreva a ação tomada na observação.', 'warn'); }
+  const btn = $('#fBtn'); btn.disabled = true; btn.textContent = 'Salvando…';
+  api('salvarLeitura', S.token, Object.assign({ equip: e.id, obs: obs }, l)).then(r => {
+    e.ultima = Object.assign({ ts: r.ts, obs: obs }, l);
+    e.lidoTurno = true; e.alertas = r.alertas;
+    formEq = null; fecharModal(); renderColeta();
+    if (navigator.vibrate) try { navigator.vibrate(60); } catch (x) {}
+    const pend = S.ini.equipamentos.filter(x => !x.lidoTurno).length;
+    const msg = r.alertas.length ? 'Salvo — leitura fora da faixa registrada.' : 'Leitura salva ✓';
+    toast(msg + (pend ? ' Faltam ' + pend + '.' : ' Turno completo!'), r.alertas.length ? 'warn' : 'ok', pend ? { txt: 'Próximo QR', fn: abrirScanner } : null);
+  }).catch(err => { toast(err.message, 'bad'); btn.disabled = false; btn.textContent = 'Salvar leitura'; });
+}
+
+/* ---------- Scanner QR ---------- */
+let qr = null, qrLido = false, qrTorch = false;
+
+// Garante a biblioteca do leitor (tenta um segundo CDN se o primeiro falhar)
+function carregarLeitor() {
+  if (window.Html5Qrcode) return Promise.resolve();
+  return new Promise((res, rej) => {
+    let n = 0;
+    const espera = setInterval(() => {
+      if (window.Html5Qrcode) { clearInterval(espera); return res(); }
+      if (++n === 15) {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';
+        document.head.appendChild(s);
+      }
+      if (n > 60) { clearInterval(espera); rej(new Error('leitor')); }
+    }, 100);
+  });
+}
+
+function abrirScanner() {
+  qrLido = false; qrTorch = false;
+  modal('Escanear QR',
+    '<div id="leitor"></div>' +
+    '<p class="muted center" id="scanMsg">Abrindo a câmera…</p>' +
+    '<button class="btn sec full hidden" type="button" id="btnTorch" onclick="alternarLanterna()">Ligar lanterna</button>',
+    '<button class="btn" type="button" onclick="fecharModal()">Escolher na lista</button>', pararScanner);
+  iniciarCamera();
+}
+
+function iniciarCamera() {
+  const msg = $('#scanMsg');
+  carregarLeitor().then(() => {
+    if (!$('#leitor')) return;
+    const cfgLeitor = { verbose: false, experimentalFeatures: { useBarCodeDetectorIfSupported: true } };
+    if (window.Html5QrcodeSupportedFormats) cfgLeitor.formatsToSupport = [Html5QrcodeSupportedFormats.QR_CODE];
+    qr = new Html5Qrcode('leitor', cfgLeitor);
+    const opcoes = {
+      fps: 15, aspectRatio: 1,
+      qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.72); return { width: s, height: s }; }
+    };
+    return qr.start({ facingMode: 'environment' }, opcoes, txt => lidoQR(txt), () => {}).then(() => {
+      msg.textContent = 'Aponte para o QR Code da etiqueta do termômetro.';
+      try {
+        const cap = qr.getRunningTrackCapabilities();
+        if (cap && cap.torch) $('#btnTorch').classList.remove('hidden');
+      } catch (e) {}
+    });
+  }).catch(err => {
+    qr = null;
+    const nome = (err && (err.name || err.message || String(err))) || '';
+    const negado = /NotAllowed|Permission|denied/i.test(nome);
+    const semCam = /NotFound|no camera|Requested device not found/i.test(nome);
+    if (!$('#leitor')) return;
+    $('#leitor').style.display = 'none';
+    msg.innerHTML = negado && DENTRO_APPS_SCRIPT
+      ? '<b>O Google bloqueia a câmera dentro do endereço script.google.com.</b><br>Para escanear, abra o app pelo link da versão para celular.'
+      : negado
+      ? '<b>A câmera foi bloqueada.</b><br>Toque no cadeado ao lado do endereço do site, permita a <b>Câmera</b> e depois toque em "Tentar de novo".'
+      : semCam ? 'Nenhuma câmera encontrada neste aparelho.'
+      : err && err.message === 'leitor' ? 'Sem conexão para carregar o leitor. Verifique a internet e tente de novo.'
+      : 'Não foi possível abrir a câmera. Feche outros apps que estejam usando a câmera e tente de novo.';
+    $('#mPe').innerHTML = '<button class="btn" type="button" onclick="fecharModal()">Escolher na lista</button>' +
+      '<button class="btn pri" type="button" onclick="abrirScanner()">Tentar de novo</button>';
+  });
+}
+
+function alternarLanterna() {
+  if (!qr) return;
+  qrTorch = !qrTorch;
+  qr.applyVideoConstraints({ advanced: [{ torch: qrTorch }] })
+    .then(() => { $('#btnTorch').textContent = qrTorch ? 'Desligar lanterna' : 'Ligar lanterna'; })
+    .catch(() => { qrTorch = !qrTorch; });
+}
+
+function pararScanner() {
+  if (qr) { const q = qr; qr = null; try { q.stop().then(() => q.clear()).catch(() => {}); } catch (e) {} }
+}
+function lidoQR(txt) {
+  if (qrLido) return; qrLido = true;
+  let id = String(txt || '').trim();
+  const m = id.match(/[?&]data=([^&]+)/); if (m) id = decodeURIComponent(m[1]);
+  id = id.toLowerCase();
+  const e = S.ini.equipamentos.find(x => x.id.toLowerCase() === id);
+  fecharModal();
+  if (!e) return toast('Este QR (' + id.slice(0, 20) + ') não é de um termômetro ativo desta filial.', 'bad');
+  if (navigator.vibrate) try { navigator.vibrate(40); } catch (x) {}
+  abrirForm(e.id);
+}
+
+/* ================== Histórico ================== */
+function opcoesEq(todos) {
+  return (todos ? '<option value="">Todos os termômetros</option>' : '') +
+    S.ini.equipamentos.map(e => '<option value="' + esc(e.id) + '">' + esc(e.descricao) + '</option>').join('');
+}
+
+function renderHistorico() {
+  const v = $('#v-historico');
+  if (!v.dataset.ok) {
+    v.innerHTML = '<div class="card filtros"><div class="grade3">' +
+      '<label>De<input type="date" id="hDe"></label><label>Até<input type="date" id="hAte"></label>' +
+      '<label class="span3m">Termômetro<select id="hEq"></select></label></div>' +
+      '<label class="chk"><input type="checkbox" id="hFora"> Só leituras fora da faixa</label>' +
+      '<button class="btn pri full" type="button" onclick="buscarHistorico()">Filtrar</button></div><div id="hRes"></div>';
+    $('#hDe').value = hojeISO(-6); $('#hAte').value = hojeISO();
+    $('#hEq').innerHTML = opcoesEq(true);
+    v.dataset.ok = '1';
+  }
+  buscarHistorico();
+}
+
+function buscarHistorico() {
+  const f = { filial: S.filial, de: $('#hDe').value, ate: $('#hAte').value, equip: $('#hEq').value, soFora: $('#hFora').checked };
+  if (!f.de || !f.ate) return toast('Escolha o período.', 'warn');
+  $('#hRes').innerHTML = '<div class="vazio">Carregando…</div>';
+  api('historico', S.token, f).then(r => {
+    if (!r.itens.length) { $('#hRes').innerHTML = '<div class="vazio">Nenhuma leitura no período.</div>'; return; }
+    const grupos = [], idx = {};
+    r.itens.forEach(l => { const k = fD(l.ts); if (!(k in idx)) { idx[k] = grupos.length; grupos.push({ k: k, ls: [] }); } grupos[idx[k]].ls.push(l); });
+    $('#hRes').innerHTML = '<div class="resumo"><span class="chip pri">' + r.total + ' leituras</span><span class="chip ' + (r.fora ? 'bad' : 'ok') + '">' + r.fora + ' fora da faixa</span></div>' +
+      (r.totalFiltro > r.exibidos ? '<p class="muted" style="font-size:13px">Mostrando as ' + r.exibidos + ' mais recentes. Use o relatório em PDF para o período completo.</p>' : '') +
+      grupos.map(g => '<h4 class="dia">' + esc(g.k) + '</h4><div class="lista">' + g.ls.map(itemHist).join('') + '</div>').join('');
+  }).catch(err => { $('#hRes').innerHTML = '<div class="erro">' + esc(err.message) + '</div>'; });
+}
+
+function itemHist(l) {
+  return '<div class="hist' + (l.alertas.length ? ' bad' : '') + '"><div class="a"><b>' + esc(l.desc) + '</b>' +
+    '<small>' + fH(l.ts) + ' · ' + esc(l.usuario) + '</small>' +
+    '<small>Máx ' + fN(l.tmax) + ' / Mín ' + fN(l.tmin) + ' °C · Umid. ' + fN(l.umax, 0) + ' / ' + fN(l.umin, 0) + '%</small>' +
+    (l.alertas.length ? '<div class="al">' + l.alertas.map(esc).join(' · ') + '</div>' : '') +
+    (l.obs ? '<div class="ob">' + esc(l.obs) + '</div>' : '') +
+    '</div><div class="v"><strong>' + fN(l.t) + ' °C</strong><span>' + fN(l.u, 0) + '% umid.</span></div></div>';
+}
+
+/* ================== Painel ================== */
+const CORES = ['#0891b2', '#f97316', '#16a34a', '#9333ea', '#e11d48', '#0d9488', '#ca8a04', '#2563eb', '#db2777', '#65a30d', '#7c3aed', '#475569'];
+
+function renderPainel() {
+  const v = $('#v-painel');
+  if (!v.dataset.ok) {
+    v.innerHTML = '<div class="chips" id="pDias">' + [7, 15, 30, 90].map(n => '<button type="button" data-n="' + n + '">' + n + ' dias</button>').join('') + '</div><div id="pRes"></div>';
+    v.querySelectorAll('#pDias button').forEach(b => b.onclick = () => { S.painelDias = +b.dataset.n; buscarPainel(); });
+    v.dataset.ok = '1';
+  }
+  buscarPainel();
+}
+
+function buscarPainel() {
+  $('#v-painel').querySelectorAll('#pDias button').forEach(b => b.classList.toggle('on', +b.dataset.n === S.painelDias));
+  $('#pRes').innerHTML = '<div class="vazio">Carregando…</div>';
+  api('painel', S.token, { filial: S.filial, de: hojeISO(-(S.painelDias - 1)), ate: hojeISO() }).then(r => { S.painelDados = r; desenharPainel(); })
+    .catch(err => { $('#pRes').innerHTML = '<div class="erro">' + esc(err.message) + '</div>'; });
+}
+
+function desenharPainel() {
+  const r = S.painelDados, R = r.resumo;
+  const kpi = (rot, val, cls) => '<div class="kpi ' + (cls || '') + '"><small>' + rot + '</small><b>' + val + '</b></div>';
+  if (!R.leituras) {
+    const u = r.ultimaFilial;
+    $('#pRes').innerHTML = '<div class="card center" style="padding:28px 18px">' + ic('alert') +
+      '<h3 style="margin:10px 0 6px">Nenhuma leitura nos últimos ' + S.painelDias + ' dias</h3>' +
+      '<p class="muted" style="margin:0">' + (u
+        ? 'A última leitura desta filial foi em <b>' + new Date(u.ts).toLocaleString('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</b>, por ' + esc(u.usuario) + '.'
+        : 'Esta filial ainda não tem leituras registradas.') + '</p>' +
+      (S.painelDias < 90 ? '<button class="btn sec" type="button" style="margin-top:14px" onclick="S.painelDias=' + (S.painelDias < 30 ? 30 : 90) + ';buscarPainel()">Ver ' + (S.painelDias < 30 ? 30 : 90) + ' dias</button>' : '') +
+      '</div>';
+    return;
+  }
+  const serieT = S.painelSerie === 'tMax' ? 'tMax' : 'tMed', serieU = S.painelSerie === 'tMax' ? 'uMax' : 'uMed';
+  $('#pRes').innerHTML =
+    '<div class="kpis">' + kpi('Leituras', R.leituras) +
+    kpi('Conformidade', R.conformidade == null ? '–' : fN(R.conformidade, 1) + '%', R.conformidade == null ? '' : R.conformidade >= 98 ? 'ok' : 'bad') +
+    kpi('Fora da faixa', R.fora, R.fora ? 'bad' : 'ok') +
+    kpi('Turnos registrados', R.cobertura == null ? '–' : R.cobertura + '%', R.cobertura != null && R.cobertura < 90 ? 'bad' : '') + '</div>' +
+    '<div class="chips"><button type="button" id="sMax"' + (serieT === 'tMax' ? ' class="on"' : '') + '>Máxima do dia</button><button type="button" id="sMed"' + (serieT === 'tMed' ? ' class="on"' : '') + '>Média do dia</button></div>' +
+    '<div class="card"><h3>Temperatura (°C)</h3><div class="graf"><canvas id="gT"></canvas></div></div>' +
+    '<div class="card"><h3>Umidade (%)</h3><div class="graf"><canvas id="gU"></canvas></div></div>' +
+    '<div class="card"><h3>Por termômetro</h3><div class="tab-w"><table class="t"><thead><tr><th>Termômetro</th><th>Leituras</th><th>Turnos</th><th>Temp. mín / méd / máx</th><th>Umid. méd</th><th>Fora</th><th>Última</th></tr></thead><tbody>' +
+    r.equipamentos.map(e => '<tr><td><b>' + esc(e.desc) + '</b></td><td>' + e.n + '</td><td><span class="barra"><i style="width:' + e.cobertura + '%"></i></span>' + e.cobertura + '%</td>' +
+      '<td>' + fN(e.tMin) + ' / ' + fN(e.tMed) + ' / <b' + (e.tMax != null && e.tMax > e.tmax ? ' style="color:var(--bad)"' : '') + '>' + fN(e.tMax) + '</b></td><td>' + fN(e.uMed, 0) + '%</td>' +
+      '<td>' + (e.fora ? '<span class="chip bad">' + e.fora + '</span>' : '<span class="chip ok">0</span>') + '</td><td>' + (e.ultima ? fDT(e.ultima.ts) : '–') + '</td></tr>').join('') +
+    '</tbody></table></div></div>' +
+    (r.foraLista.length ? '<div class="card"><h3>Ocorrências fora da faixa</h3><div class="lista">' + r.foraLista.map(o =>
+      '<div class="hist bad"><div class="a"><b>' + esc(o.desc) + '</b><small>' + fDT(o.ts) + ' · ' + esc(o.usuario) + '</small><div class="al">' + o.alertas.map(esc).join(' · ') + '</div>' +
+      (o.obs ? '<div class="ob">' + esc(o.obs) + '</div>' : '<div class="ob" style="color:var(--bad)">Sem observação registrada</div>') + '</div></div>').join('') + '</div></div>' : '');
+
+  $('#sMax').onclick = () => { S.painelSerie = 'tMax'; desenharPainel(); };
+  $('#sMed').onclick = () => { S.painelSerie = 'tMed'; desenharPainel(); };
+  if (!window.Chart) { $('#gT').parentNode.innerHTML = '<p class="muted">Gráfico indisponível (sem conexão com a biblioteca).</p>'; $('#gU').parentNode.innerHTML = ''; return; }
+  const labels = r.dias.map(k => k.slice(8, 10) + '/' + k.slice(5, 7));
+  const FP = S.ini.faixaPadrao;
+  const ref = r.equipamentos[0] || { tmax: FP.TEMP_MAX, tmin: FP.TEMP_MIN, umax: FP.UMID_MAX, umin: FP.UMID_MIN };
+  grafico('gT', labels, r.equipamentos.map((e, i) => ({ label: e.desc, data: e.serie[serieT], cor: CORES[i % CORES.length] })), ref.tmax, ref.tmin, ' °C');
+  grafico('gU', labels, r.equipamentos.map((e, i) => ({ label: e.desc, data: e.serie[serieU], cor: CORES[i % CORES.length] })), ref.umax, ref.umin, '%');
+}
+
+function grafico(id, labels, series, lmax, lmin, un) {
+  if (S.charts[id]) { S.charts[id].destroy(); delete S.charts[id]; }
+  const ds = series.map(s => ({ label: s.label, data: s.data, borderColor: s.cor, backgroundColor: s.cor, borderWidth: 2, pointRadius: labels.length > 31 ? 0 : 2.5, tension: .25, spanGaps: true }));
+  if (lmax != null) ds.push({ label: 'Limite máx.', data: labels.map(() => lmax), borderColor: '#dc2626', borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, fill: false });
+  if (lmin != null) ds.push({ label: 'Limite mín.', data: labels.map(() => lmin), borderColor: '#2563eb', borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0, fill: false });
+  S.charts[id] = new Chart(document.getElementById(id), {
+    type: 'line', data: { labels: labels, datasets: ds },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => c.dataset.label + ': ' + (c.parsed.y == null ? '–' : fN(c.parsed.y, un === '%' ? 0 : 1) + un) } }
+      },
+      scales: { x: { ticks: { maxTicksLimit: 10, font: { size: 11 } } }, y: { ticks: { font: { size: 11 } } } }
+    }
+  });
+}
+
+/* ================== Relatório ================== */
+function renderRelatorio() {
+  const v = $('#v-relatorio');
+  if (!v.dataset.ok) {
+    v.innerHTML = '<div class="card"><h3>Relatório em PDF</h3><p class="muted" style="margin-top:-4px;font-size:13.5px">Planilha de registro por termômetro, pronta para imprimir e assinar.</p>' +
+      '<div class="chips"><button type="button" onclick="periodoRel(\'mes\')">Mês atual</button><button type="button" onclick="periodoRel(\'ant\')">Mês anterior</button><button type="button" onclick="periodoRel(\'7\')">Últimos 7 dias</button></div>' +
+      '<div class="grade2"><label>De<input type="date" id="rDe"></label><label>Até<input type="date" id="rAte"></label></div>' +
+      '<label>Termômetro<select id="rEq"></select></label>' +
+      '<button class="btn pri full" type="button" id="rBtn" onclick="gerarRel()">' + ic('file') + 'Gerar PDF</button><div id="rRes" style="margin-top:14px"></div></div>';
+    $('#rEq').innerHTML = opcoesEq(true);
+    periodoRel('mes');
+    v.dataset.ok = '1';
+  }
+}
+function periodoRel(t) {
+  const h = hojeISO(), y = +h.slice(0, 4), m = +h.slice(5, 7);
+  const iso = (a, b, c) => a + '-' + ('0' + b).slice(-2) + '-' + ('0' + c).slice(-2);
+  if (t === 'mes') { $('#rDe').value = iso(y, m, 1); $('#rAte').value = h; }
+  else if (t === 'ant') { const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1; $('#rDe').value = iso(py, pm, 1); $('#rAte').value = iso(py, pm, new Date(py, pm, 0).getDate()); }
+  else { $('#rDe').value = hojeISO(-6); $('#rAte').value = h; }
+}
+function gerarRel() {
+  const f = { filial: S.filial, de: $('#rDe').value, ate: $('#rAte').value, equip: $('#rEq').value };
+  if (!f.de || !f.ate) return toast('Escolha o período.', 'warn');
+  const b = $('#rBtn'); b.disabled = true; b.innerHTML = 'Gerando… pode levar alguns segundos';
+  $('#rRes').innerHTML = '';
+  api('gerarRelatorio', S.token, f).then(r => {
+    $('#rRes').innerHTML = '<div class="faixa"><b>' + esc(r.nome) + '</b><br>' + r.leituras + ' leituras · salvo na pasta Reports do Drive</div>' +
+      '<a class="btn sec full" href="' + esc(r.url) + '" target="_blank" rel="noopener">' + ic('ext') + 'Abrir PDF</a>';
+  }).catch(err => { $('#rRes').innerHTML = '<div class="erro">' + esc(err.message) + '</div>'; })
+    .finally(() => { b.disabled = false; b.innerHTML = ic('file') + 'Gerar PDF'; });
+}
+
+/* ================== Cadastros (admin) ================== */
+function renderCadastros() {
+  const v = $('#v-cadastros');
+  v.innerHTML = '<div class="seg" id="cSeg"><button type="button" data-a="eq">Termômetros</button><button type="button" data-a="us">Usuários</button><button type="button" data-a="qr">Etiquetas QR</button></div><div id="cRes"><div class="vazio">Carregando…</div></div>';
+  v.querySelectorAll('#cSeg button').forEach(b => b.onclick = () => { S.cadAba = b.dataset.a; desenharCad(); });
+  busy(true);
+  api('carregarCadastros', S.token).then(d => { S.cad = d; desenharCad(); })
+    .catch(err => { $('#cRes').innerHTML = '<div class="erro">' + esc(err.message) + '</div>'; }).finally(() => busy(false));
+}
+
+const nomeFil = id => { const f = (S.cad ? S.cad.filiais : S.ini.filiais).find(x => x.id === id); return f ? f.nome : id; };
+
+function desenharCad() {
+  if (!S.cad) return;
+  $('#cSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.a === S.cadAba));
+  const eqs = S.cad.equipamentos.filter(e => e.filial === S.filial);
+  let h = '';
+  if (S.cadAba === 'eq') {
+    h = '<div class="sec-h" style="margin-top:0"><h3>Termômetros · ' + esc(nomeFil(S.filial)) + '</h3><button class="btn pri" type="button" onclick="formEqCad()">' + ic('plus') + 'Novo</button></div><div class="lista">' +
+      (eqs.map(e => '<button class="item' + (e.ativo ? '' : ' pend') + '" type="button" onclick="formEqCad(\'' + esc(e.id) + '\')"><span class="ico">' + ic('thermo') + '</span><span class="txt"><b>' + esc(e.descricao) + '</b>' +
+        '<small>' + fN(e.tmin) + '–' + fN(e.tmax) + ' °C · ' + fN(e.umin, 0) + '–' + fN(e.umax, 0) + '%' + (e.local ? ' · ' + esc(e.local) : '') + '</small></span>' +
+        '<span class="chip ' + (e.ativo ? 'ok' : '') + '">' + (e.ativo ? 'Ativo' : 'Inativo') + '</span></button>').join('') || '<div class="vazio">Nenhum termômetro nesta filial.</div>') + '</div>';
+  } else if (S.cadAba === 'us') {
+    h = '<div class="sec-h" style="margin-top:0"><h3>Usuários</h3><button class="btn pri" type="button" onclick="formUsCad()">' + ic('plus') + 'Novo</button></div><div class="lista">' +
+      S.cad.usuarios.map(u => '<button class="item" type="button" onclick="formUsCad(\'' + esc(u.id) + '\')"><span class="ico" style="font-weight:700">' + esc((u.nome || '?')[0]) + '</span><span class="txt"><b>' + esc(u.nome) + '</b>' +
+        '<small>' + esc(u.email) + ' · ' + esc(nomeFil(u.filial)) + (u.temSenha ? '' : ' · ainda sem senha') + '</small></span>' +
+        '<span class="chip ' + (!u.ativo ? '' : u.perm === 'ADMIN' ? 'pri' : 'ok') + '">' + (!u.ativo ? 'Inativo' : u.perm === 'ADMIN' ? 'Admin' : 'Usuário') + '</span></button>').join('') + '</div>';
+  } else {
+    const ativos = eqs.filter(e => e.ativo);
+    h = '<div class="sec-h" style="margin-top:0"><h3>Etiquetas · ' + esc(nomeFil(S.filial)) + '</h3><button class="btn pri" type="button" onclick="window.print()">' + ic('print') + 'Imprimir</button></div>' +
+      '<div id="etqArea"><div class="etq">' + ativos.map(e => '<div><img alt="QR" src="' + esc(e.imagem || ('https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(e.id))) + '"><b>' + esc(e.descricao) + '</b><small>' + esc(nomeFil(e.filial)) + ' · ' + esc(e.id) + '</small></div>').join('') + '</div></div>';
+  }
+  $('#cRes').innerHTML = h;
+}
+
+function formEqCad(id) {
+  const F = S.cad.faixaPadrao;
+  const e = id ? S.cad.equipamentos.find(x => x.id === id) : { descricao: '', local: '', filial: S.filial, tmin: F.TEMP_MIN, tmax: F.TEMP_MAX, umin: F.UMID_MIN, umax: F.UMID_MAX, ativo: true };
+  const nv = v => (v == null ? '' : String(v).replace('.', ','));
+  modal(id ? 'Editar termômetro' : 'Novo termômetro',
+    '<label>Descrição<input id="eDesc" value="' + esc(e.descricao) + '" placeholder="Ex.: Termômetro 10 - Câmara fria"></label>' +
+    '<label>Local<input id="eLoc" value="' + esc(e.local) + '" placeholder="Ex.: Armazém, corredor B"></label>' +
+    '<label>Filial<select id="eFil">' + S.cad.filiais.map(f => '<option value="' + esc(f.id) + '"' + (f.id === e.filial ? ' selected' : '') + '>' + esc(f.nome) + '</option>').join('') + '</select></label>' +
+    '<div class="grp">Faixa aceitável</div><div class="grade2">' +
+    '<label>Temp. mínima (°C)<input id="eTmin" inputmode="decimal" value="' + nv(e.tmin) + '"></label><label>Temp. máxima (°C)<input id="eTmax" inputmode="decimal" value="' + nv(e.tmax) + '"></label>' +
+    '<label>Umid. mínima (%)<input id="eUmin" inputmode="decimal" value="' + nv(e.umin) + '"></label><label>Umid. máxima (%)<input id="eUmax" inputmode="decimal" value="' + nv(e.umax) + '"></label></div>' +
+    '<label class="chk"><input type="checkbox" id="eAtivo"' + (e.ativo ? ' checked' : '') + '> Ativo (aparece na coleta)</label>' +
+    (id ? '<p class="muted" style="font-size:12.5px">ID / QR: ' + esc(id) + '</p>' : '<p class="muted" style="font-size:12.5px">O QR Code é gerado automaticamente ao salvar.</p>'),
+    '<button class="btn" type="button" onclick="fecharModal()">Cancelar</button><button class="btn pri" type="button" id="eBtn" onclick="salvarEqCad(\'' + esc(id || '') + '\')">Salvar</button>');
+}
+function salvarEqCad(id) {
+  const d = { id: id || '', descricao: $('#eDesc').value, local: $('#eLoc').value, filial: $('#eFil').value,
+    tmin: pnum($('#eTmin').value), tmax: pnum($('#eTmax').value), umin: pnum($('#eUmin').value), umax: pnum($('#eUmax').value), ativo: $('#eAtivo').checked };
+  $('#eBtn').disabled = true;
+  api('salvarEquipamento', S.token, d).then(() => { fecharModal(); toast('Termômetro salvo.', 'ok'); renderCadastros(); carregar(false); })
+    .catch(err => { toast(err.message, 'bad'); $('#eBtn').disabled = false; });
+}
+
+function formUsCad(id) {
+  const u = id ? S.cad.usuarios.find(x => x.id === id) : { nome: '', email: '', telefone: '', filial: S.filial, perm: 'USER', ativo: true };
+  modal(id ? 'Editar usuário' : 'Novo usuário',
+    '<label>Nome<input id="uNome" value="' + esc(u.nome) + '"></label>' +
+    '<label>E-mail<input id="uEmail" type="email" value="' + esc(u.email) + '"></label>' +
+    '<label>Telefone com DDD<input id="uTel" inputmode="tel" value="' + esc(u.telefone) + '"></label>' +
+    '<div class="grade2"><label>Filial<select id="uFil">' + S.cad.filiais.map(f => '<option value="' + esc(f.id) + '"' + (f.id === u.filial ? ' selected' : '') + '>' + esc(f.nome) + '</option>').join('') + '</select></label>' +
+    '<label>Permissão<select id="uPerm"><option value="USER"' + (u.perm !== 'ADMIN' ? ' selected' : '') + '>Usuário</option><option value="ADMIN"' + (u.perm === 'ADMIN' ? ' selected' : '') + '>Administrador</option></select></label></div>' +
+    '<label class="chk"><input type="checkbox" id="uAtivo"' + (u.ativo ? ' checked' : '') + '> Ativo</label>' +
+    '<p class="muted" style="font-size:12.5px">' + (id && u.temSenha ? 'Já criou senha. Para um novo primeiro acesso, use "Resetar senha".' : 'No primeiro acesso, a senha é o telefone (só números).') + '</p>' +
+    (id ? '<button class="btn perigo full" type="button" onclick="resetSenha(\'' + esc(id) + '\')">Resetar senha</button>' : ''),
+    '<button class="btn" type="button" onclick="fecharModal()">Cancelar</button><button class="btn pri" type="button" id="uBtn" onclick="salvarUsCad(\'' + esc(id || '') + '\')">Salvar</button>');
+}
+function salvarUsCad(id) {
+  const d = { id: id || '', nome: $('#uNome').value, email: $('#uEmail').value, telefone: $('#uTel').value, filial: $('#uFil').value, perm: $('#uPerm').value, ativo: $('#uAtivo').checked };
+  $('#uBtn').disabled = true;
+  api('salvarUsuario', S.token, d).then(() => { fecharModal(); toast('Usuário salvo.', 'ok'); renderCadastros(); })
+    .catch(err => { toast(err.message, 'bad'); $('#uBtn').disabled = false; });
+}
+function resetSenha(id) {
+  if (!confirm('Resetar a senha? O usuário vai entrar de novo usando o telefone como senha.')) return;
+  api('resetarSenha', S.token, id).then(() => { fecharModal(); toast('Senha resetada.', 'ok'); renderCadastros(); }).catch(err => toast(err.message, 'bad'));
+}
+
+/* ================== Início ================== */
+(function iniciar() {
+  S.token = store.get('tmp_token');
+  S.filial = store.get('tmp_filial');
+  const em = store.get('tmp_email'); if (em) $('#lEmail').value = em;
+  if (S.token) entrarApp(); else mostrar('login');
+})();
+</script>
+</body>
+</html>
